@@ -12,9 +12,10 @@ final.data <- fread("data/output/acs_medicaid.txt")
 ################################### Summary of the data 
 #1 
 
-final.data$perc_unins <- final.data$ins_direct/ final.data$adult_pop *100
+final.data$perc_direct <-(final.data$ins_direct/ final.data$adult_pop) *100
+final.data$perc_unins <- (final.data$uninsured/ final.data$adult_pop)*100
 
-graph1 <-final.data %>% group_by(year) %>% summarize(avg_share = mean(perc_unins))%>% 
+graph1 <-final.data %>% group_by(year) %>% summarize(avg_share = mean(perc_direct))%>% 
  ggplot(aes(x = year, y = avg_share)) +
   geom_line() +
   labs(x = "Year", y = "Share of Insured Individuals with Direct Purchase Health Insurance Over Years") +
@@ -42,24 +43,22 @@ graph2
 
 #4 
 
-data_q4 <- final.data %>% filter((expand_ever == FALSE | expand_year == 2014) & State != "South Dakota")
+graph_dta <- final.data %>% filter(expand_year == 2014 | is.na(expand_year), !is.na(expand_ever)) %>%
+  group_by(expand_ever, year) %>% summarise(mean=mean(perc_unins)) 
 
 
-graph_dta <-  data_q4 %>% group_by(expand_year, year) %>% 
-  summarize(avg = mean(perc_unins))
-
-
-
-graph_dta$expand_year  <- if_else(is.na(graph_dta$expand_year), "Average of states that never expanded", "Average of states that expanded in 2014")
-
-
-graph_dta
-
-
-graph4 <- ggplot(graph_dta, aes(x = as.factor(year), y = avg, group = expand_year)) +
-  geom_line(aes(color = expand_year)) +
-  labs( color = "Average of states", x = "Year", y = "Share of Uninsured") +
-  theme_bw()
+graph4 <- ggplot(data = graph_dta, aes(x = year, y = mean, 
+                                       group = expand_ever,
+                                       linetype = expand_ever)) + 
+  geom_line() + geom_point() + theme_bw() +
+  geom_vline(xintercept=2013.5, color="red") +
+  geom_text(data = graph_dta %>% filter(year == 2016), 
+            aes(label = c("Non-expansion","Expansion"),
+                x = year + 1,
+                y = mean)) +
+  guides(linetype="none") +
+  labs(x = "Year", y = "Fraction Uninsured", title = "Share of Uninsured over Time") +
+  theme(plot.title = element_text(hjust = 0.5)) 
 
 graph4 
 
@@ -68,11 +67,13 @@ graph4
 
 # 1 
 
-ate_1 <- data_q4 %>% filter(year %in% c(2012, 2015)) %>% 
+ate_1 <- final.data %>% filter(year %in% c(2012, 2015)) %>% 
+  filter(!is.na(expand_ever))%>% 
   group_by(expand_ever, year) %>% 
-  summarize(perc_unin = mean(perc_unins)) %>%
-  spread(year, perc_unin)%>% 
+  summarize(perc_unins = mean(perc_unins, na.rm = TRUE)) %>%
+  spread(year, perc_unins)%>% 
   mutate(expand_ever = if_else(expand_ever == FALSE, "States that never expanded Medicaid", "States that expanded in 2014"))
+
 
 
 
@@ -81,12 +82,12 @@ ate_1
 
 #2 
 
-data_q4$treatment <- ifelse(data_q4$expand_ever == TRUE, 1,0)
+year_2014<- final.data %>% filter(expand_year==2014 | is.na(expand_year), !is.na(expand_ever)) %>%
+  mutate(post = (year>=2014), 
+         treat=post*expand_ever)
 
-data_q4$time <- ifelse(data_q4$year >= 2014, 1, 0)
 
-
-ate_2 <- lm(perc_unins ~ treatment + time + treatment*time, data = data_q4)
+ate_2 <- feols(perc_unins ~ expand_ever + post + treat, data = year_2014)
 
 summary(ate_2)
 
@@ -95,16 +96,16 @@ summary(ate_2)
 
 ate_3 <- feols(perc_unins~i(year, expand_ever, ref= 2013) | State + year,
                cluster=~State,
-               data=data_q4)
+               data=year_2014)
 
 summary(ate_3)
 
 # 4 
 
 data <- final.data %>% 
-  filter(!is.na(expand_ever) & State != "South Dakota") %>%
-  mutate(time_to_treat = ifelse(expand_ever==FALSE, 0, year-expand_year), 
-         time_to_treat = ifelse(time_to_treat < -3, -3, time_to_treat))
+  filter(!is.na(expand_ever)) %>%
+  mutate(time_to_treat = ifelse(expand_ever==TRUE,year-expand_year, -1), 
+         time_to_treat = ifelse(time_to_treat <= -4, -4, time_to_treat))
 
 
 ate_4<- feols(perc_unins~i(time_to_treat, expand_ever, ref=-1) | State + year,
@@ -119,22 +120,15 @@ summary(ate_4)
 
 coefplot(ate_3)
 
-
+iplot(ate_3, 
+      xlab = 'Time to treatment',
+      main = 'Event study')
 
 # 6 
 
-coefplot(ate_4)
-
-
-
-
-
-
-
-
-
-
-
+iplot(ate_4, 
+      xlab = 'Time to treatment',
+      main = 'Event study')
 
 
 save.image("Hwk5_workspace.Rdata")
