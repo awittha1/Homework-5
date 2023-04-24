@@ -7,7 +7,7 @@ library(fixest)
 final.insurance <- fread("data/output/acs_insurance.txt")
 final.data <- fread("data/output/acs_medicaid.txt")
 #kff.final <- fread("data/output/medicaid_expansion.txt")
-
+final.data <- final.data %>% filter(!(State %in% c("Puerto Rico", "District of Columbia")))
 
 ################################### Summary of the data 
 #1 
@@ -69,10 +69,11 @@ graph4
 
 ate_1 <- final.data %>% filter(year %in% c(2012, 2015)) %>% 
   filter(!is.na(expand_ever))%>% 
+  filter(expand_year == 2014 | is.na(expand_year)) %>% 
   group_by(expand_ever, year) %>% 
   summarize(perc_unins = mean(perc_unins, na.rm = TRUE)) %>%
   spread(year, perc_unins)%>% 
-  mutate(expand_ever = if_else(expand_ever == FALSE, "States that never expanded Medicaid", "States that expanded in 2014"))
+  mutate(expand_ever = if_else(expand_ever == FALSE, "Non-Expansion", "Expansion"))
 
 
 
@@ -100,6 +101,11 @@ ate_3 <- feols(perc_unins~i(year, expand_ever, ref= 2013) | State + year,
 
 summary(ate_3)
 
+
+
+ate_q3 <-  feols(perc_unins~expand_ever + post + treat | State + year,
+                 cluster=~State,
+                 data=year_2014)
 # 4 
 
 data <- final.data %>% 
@@ -112,7 +118,7 @@ ate_4<- feols(perc_unins~i(time_to_treat, expand_ever, ref=-1) | State + year,
                   cluster=~State,
                   data=data)
 
-
+ate_q4 <- 
 summary(ate_4)
 
 
