@@ -1,0 +1,116 @@
+---
+title: "Homework 5"
+author: "Alexia Witthaus Viñé"
+date: "`r Sys.Date()`"
+header-includes:
+  - \usepackage{booktabs}
+output: 
+  bookdown::pdf_document2:
+    fig_caption: yes
+    toc: false
+---
+
+```{r,echo = FALSE, warning = FALSE}
+load("Hwk5_workspace.Rdata")
+library(modelsummary)
+library(kableExtra)
+library(fixest)
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning = FALSE, fig.width = 16/2, fig.height = 9/2, tidy.opts=list(width.cutoff=60), tidy=TRUE)
+```
+
+
+# Summary of the data 
+
+```{r, fig.cap = "Direct Purchase Health Insurance Over Time"}
+graph1
+```
+
+ Some of the policies leading to the reduction could be on the one had the expansion of Medicaid. Some people who previously had to directly purchase their insurance, are now elegible for Medicaid, which is why they don't purchase their insurance anymore. In addition to this, through the Affordable Care Act, individuals could purchase their insurance through federal and state exchanges, which decreased the demand for direct purchased plans. Lastly, the increased offering from health insurance from  employers as well as the increase in popularity of the Medicare Advantage Program, could have contributed to the decline.
+
+```{r, fig.cap="Share of individuals with Medicaid" }
+graph2
+```
+
+```{r, fig.cap="Share of uninsured over time"}
+graph4
+```
+
+\newpage
+
+# Estimate of the ATE's
+
+## Differences in Averages 
+```{r}
+kable(ate_1, caption = "Differences in averages") %>% 
+  kable_styling(latex_options = "hold_position", position = "center")
+```
+
+
+## Different regressions 
+
+
+
+```{r}
+models <- list(
+  "DiD estimation"     = ate_2,
+  "DiD with fixed effects" = ate_q3,
+  "Staggered DiD"     = ate_q4
+)
+
+modelsummary(models, keep = "treat", gof_map = c("nobs", "r.squared"), caption = "DiD estimates") %>% 
+  kable_styling(latex_options = "hold_position", position = "center")
+```
+
+
+
+The results for the first two regressions are identical, while the estimate from the staggered DiD is different. They are different, because for the first two, we are using the same states (expanded in 2014 vs. never expanded), while for the third one we are also using the states that expanded after 2014. 
+
+
+## Event studies
+
+```{r}
+iplot(ate_3, 
+      xlab = 'Time to treatment ( DiD with fixed effects)',
+      main = 'Event study')
+
+```
+
+
+
+
+
+
+```{r, fig.align= "" }
+iplot(ate_4, 
+      xlab = 'Time to treatment (Staggered DiD with fixed effects)',
+      main = 'Event study')
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
